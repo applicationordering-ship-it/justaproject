@@ -1,0 +1,453 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8" />
+<meta name="viewport" content="width=device-width,initial-scale=1" />
+<title>Demonstrasi dinein</title>
+<style>
+  :root{
+    --accent:#ff6b00;
+    --muted:#666;
+    --card:#fff;
+    --bg:#f4f5f7;
+    --glass: rgba(255,255,255,0.85);
+  }
+  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#111}
+  .app{max-width:980px;margin:18px auto;padding:16px}
+  header{display:flex;align-items:center;gap:12px}
+  header h1{margin:0;font-size:20px}
+  .note{font-size:13px;color:var(--muted)}
+  .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
+  .btn{background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+  .btn.secondary{background:#fff;color:var(--accent);border:1px solid #eee}
+  .btn.ghost{background:transparent;color:var(--accent);border:1px dashed #ffd0b8}
+  .card{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(10,10,10,0.04);margin-top:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
+  .menu-item{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;border:1px solid #f0f0f0}
+  .item-info{flex:1}
+  .item-title{font-weight:700}
+  .item-price{font-size:13px;color:var(--muted);margin-top:4px}
+  .qty{display:inline-flex;align-items:center;border-radius:999px;overflow:hidden;border:1px solid #eee}
+  .qty button{width:34px;height:34px;border:0;background:transparent;cursor:pointer;font-weight:700}
+  .qty .count{padding:0 10px;min-width:36px;text-align:center}
+  .finish-floating{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:60}
+  .hidden{display:none}
+  /* scanner */
+  #scannerModal{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:80}
+  #scannerCard{width:95%;max-width:520px;background:var(--glass);backdrop-filter:blur(4px);padding:12px;border-radius:12px}
+  video{width:100%;height:auto;border-radius:10px;background:#000}
+  .scanner-info{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
+  .summary-list{max-height:50vh;overflow:auto;margin-top:8px}
+  .summary-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #eee}
+  .status{margin-top:8px;padding:8px;border-radius:8px;background:#f0fdf4;color:#1e7516;border:1px solid #d9f5d5}
+  small.hint{color:var(--muted)}
+  footer{margin-top:22px;font-size:12px;color:var(--muted)}
+  .icon-placeholder{width:54px;height:54px;border-radius:8px;background:linear-gradient(135deg,#fff,#f6f6f6);display:flex;align-items:center;justify-content:center;font-weight:700;color:#ccc}
+  @media (min-width:780px){header h1{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header>
+    <img src="" alt="broken" style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#ffd9c2,#ffb38a)" />
+    <div>
+      <h1>Dine-in</h1>
+      <div class="note">Welcome to the dine-in.</div>
+    </div>
+  </header>
+
+  <div class="controls">
+    <button id="dineBtn" class="btn">🍽️ Dine In*</button>
+    <button id="takeawayBtn" class="btn secondary">🛍️ Takeaway*</button>
+    <button id="help" class="btn ghost">❓ Help</button>
+  </div>
+
+  <!-- Menu (grouped) -->
+  <div class="card">
+    <strong>Menu</strong>
+    <div class="note">Here is what you can order.</div>
+
+    <div style="margin-top:12px">
+      <h3>Fried Rice</h3>
+      <div id="nasgorList" class="grid"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <h3>Main Dishes</h3>
+      <div id="mainsList" class="grid"></div>
+    </div>
+
+    <div style="margin-top:12px">
+      <h3>Drinks</h3>
+      <div id="drinksList" class="grid"></div>
+    </div>
+  </div>
+
+  <div id="orderStatus" class="card hidden"></div>
+
+  <div class="finish-floating hidden" id="finishWrap">
+    <button id="finishBtn" class="btn" style="min-width:220px">Finish Order • <span id="cartCount">0</span> items</button>
+  </div>
+
+  <footer>
+    <div>you dont need to pay</div>
+  </footer>
+</div>
+
+
+<!-- include Ably + jsQR from CDN -->
+<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
+<script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+
+<script>
+/* -------------------------
+   CONFIG: paste your keys here
+   -------------------------
+   ABLY_KEY: get from ably.com and paste here so this page can publish/subscribe.
+   GOFILE_BASE: base URL where you store icons (optional). Icons are looked up as GOFILE_BASE/NAME.png
+*/
+const ABLY_KEY = '4YUf4A.RiD-Mg:c9JvITXInFw5WPHn4TdcIpd13gY-5jIfhZbxOGXMEvU'; // <-- replace with your Ably API key (key:xxxx)
+const GOFILE_BASE = '/'; // <-- optional: paste gofile base path that contains icons (example: https://gofile.io/d/abcd1234)
+
+/* -------------------------
+   Data: menu (structured, with numeric prices in IDR)
+   ------------------------- */
+const MENU = {
+  nasigoreng: [
+    { id: 'ng_ayam', name: 'Chicken Fried Rice', price: 28000, icon: 'nasi_goreng_ayam.png' },
+    { id: 'ng_spesial', name: 'Special Fried Rice', price: 28000, icon: 'nasi_goreng_spesial.png' },
+    { id: 'ng_ikan', name: 'Nasi Goreng Ikan Asin', price: 26000, icon: 'nasi_goreng_ikan.png' },
+    { id: 'ng_aceh', name: 'Nasi Goreng Aceh', price: 27000, icon: 'nasi_goreng_aceh.png' },
+    { id: 'ng_jawa', name: 'Nasi Goreng Jawa', price: 27000, icon: 'nasi_goreng_jawa.png' }
+  ],
+  mains: [
+    { id: 'ch_pep', name: 'Chicken Pepperoni Feast', price: 18000, icon: 'ch_pepperoni.png' },
+    { id: 'ch_delight', name: 'Chicken Delight', price: 20000, icon: 'chicken_delight.png' },
+    { id: 'tuna_delight', name: 'Tuna Delight', price: 21000, icon: 'tuna_delight.png' }
+  ],
+  drinks: [
+    { id: 'air', name: 'Mineral Water', price: 10000, icon: 'air_mineral.png' },
+    { id: 'milo', name: 'Milo', price: 15000, icon: 'milo.png' },
+    { id: 'susu_v', name: 'Vanila Milk', price: 15000, icon: 'susu_vanila.png' },
+    { id: 'choc', name: 'Chocolate Smoothie', price: 20000, icon: 'chocolate_smoothie.png' },
+    { id: 'gt', name: 'Green Tea', price: 18000, icon: 'green_tea.png' }
+  ]
+};
+
+/* -------------------------
+   App state
+   ------------------------- */
+let cart = {}; // {itemId: {item, qty}}
+let currentTable = null; // number when dine-in
+let currentOrderId = null;
+
+/* -------------------------
+   Utilities
+   ------------------------- */
+const id = (s)=>document.getElementById(s);
+const fmt = (n)=> new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(n);
+
+/* -------------------------
+   Render menu
+   ------------------------- */
+function makeItemCard(it){
+  const el = document.createElement('div');
+  el.className = 'menu-item';
+  const iconWrap = document.createElement('div');
+
+  if (GOFILE_BASE) {
+    const img = document.createElement('img');
+    img.src = GOFILE_BASE.replace(/\/$/,'') + '/' + it.icon;
+    img.alt = it.name;
+    img.style.width='54px'; img.style.height='54px'; img.style.borderRadius='8px'; img.style.objectFit='cover';
+    iconWrap.appendChild(img);
+  } else {
+    const ph = document.createElement('div');
+    ph.className = 'icon-placeholder';
+    ph.textContent = it.name.split(' ').map(x=>x[0]).slice(0,2).join('');
+    iconWrap.appendChild(ph);
+  }
+
+  el.appendChild(iconWrap);
+
+  const info = document.createElement('div');
+  info.className = 'item-info';
+  const title = document.createElement('div');
+  title.className = 'item-title';
+  title.textContent = it.name + ' *';
+  const price = document.createElement('div');
+  price.className = 'item-price';
+  price.textContent = fmt(it.price);
+  info.appendChild(title);
+  info.appendChild(price);
+
+  const controls = document.createElement('div');
+  controls.style.display='flex';
+  controls.style.alignItems='center';
+  controls.style.gap='8px';
+  const qty = document.createElement('div');
+  qty.className = 'qty';
+  const minus = document.createElement('button');
+  minus.textContent='−';
+  const count = document.createElement('div');
+  count.className='count';
+  count.textContent = '0';
+  const plus = document.createElement('button');
+  plus.textContent='+';
+  qty.appendChild(minus); qty.appendChild(count); qty.appendChild(plus);
+  controls.appendChild(qty);
+
+  //
+
+  el.appendChild(info);
+  el.appendChild(controls);
+  return el;
+}
+
+function changeQty(item, delta, countEl){
+  const id_ = item.id;
+  const prev = cart[id_] ? cart[id_].qty : 0;
+  const next = prev + delta;
+  if (next <= 0) {
+    delete cart[id_];
+    if (countEl) countEl.textContent='0';
+  } else {
+    cart[id_] = { item, qty: next };
+    if (countEl) countEl.textContent = String(next);
+  }
+  refreshFinishButton();
+}
+
+/* render groups */
+function renderMenu(){
+  const nasgor = id('nasgorList');
+  const mains = id('mainsList');
+  const drinks = id('drinksList');
+  [nasgor, mains, drinks].forEach(n => n.innerHTML='');
+  MENU.nasigoreng.forEach(i=>nasgor.appendChild(makeItemCard(i)));
+  MENU.mains.forEach(i=>mains.appendChild(makeItemCard(i)));
+  MENU.drinks.forEach(i=>drinks.appendChild(makeItemCard(i)));
+}
+
+/* -------------------------
+   Finish button & summary
+   ------------------------- */
+function refreshFinishButton(){
+  const count = Object.values(cart).reduce((s,c)=>s+c.qty,0);
+  id('cartCount').textContent = count;
+  if (count>0) id('finishWrap').classList.remove('hidden'); else id('finishWrap').classList.add('hidden');
+}
+
+function openSummary(){
+  const list = id('summaryList'); list.innerHTML='';
+  const items = Object.values(cart);
+  let total = 0;
+  if (items.length===0) return;
+  items.forEach(c=>{
+    const row = document.createElement('div');
+    row.className = 'summary-row';
+    const left = document.createElement('div');
+    left.innerHTML = `<div style="font-weight:700">${c.item.name}</div><div style="font-size:13px;color:${'#666'}">${fmt(c.item.price)} × ${c.qty}</div>`;
+    const right = document.createElement('div');
+    right.innerHTML = `<div style="font-weight:700">${fmt(c.item.price * c.qty)}</div>`;
+    row.appendChild(left); row.appendChild(right);
+    list.appendChild(row);
+    total += c.item.price * c.qty;
+  });
+  id('summaryTotal').textContent = fmt(total);
+  id('summaryModal').classList.remove('hidden');
+}
+
+/* -------------------------
+   Ably: publish order & subscribe to updates
+   ------------------------- */
+let ablyClient = null;
+let ablyChannel = null;
+
+function initAbly(){
+  if (!ABLY_KEY || ABLY_KEY.includes('YOUR-ABLY')) {
+    console.warn('Ably key not set. Set ABLY_KEY in the script to enable realtime.');
+    return;
+  }
+  try {
+    ablyClient = new Ably.Realtime({ key: ABLY_KEY });
+    ablyChannel = ablyClient.channels.get('food-orders-demo');
+    ablyChannel.subscribe((msg) => {
+      // listen to updates from other admin HTML
+      // message.name could be 'order-updated' or otherwise
+      console.log('Ably msg', msg);
+      const data = msg.data || {};
+      if (data.orderId && data.status){
+        if (data.orderId === currentOrderId && data.status === 'completed'){
+          showOrderCompleted();
+        } else {
+          // optionally show updates for other orders (not implemented)
+        }
+      }
+    });
+    console.log('Ably initialized, subscribed to food-orders-demo channel.');
+  } catch (e){
+    console.error('Failed to init Ably', e);
+  }
+}
+
+function publishOrderPayload(payload){
+  if (!ablyChannel){
+    alert('Realtime not active (Ably key not set). Order will NOT be sent to remote.');
+    // still mark 'sent locally'
+    onOrderSentLocally(payload);
+    return;
+  }
+  ablyChannel.publish('new-order', payload, function(err){
+    if (err) {
+      console.error('Ably publish error', err);
+      alert('Failed to send order via Ably. See console.');
+    } else {
+      onOrderSentLocally(payload);
+    }
+  });
+}
+
+/* After sending */
+function onOrderSentLocally(payload){
+  currentOrderId = payload.orderId;
+  id('afterPlaceStatus').textContent = 'Order sent — waiting for updates.';
+  id('afterPlace').classList.remove('hidden');
+  id('summaryModal').classList.add('hidden');
+  id('orderStatus').classList.remove('hidden');
+  id('orderStatus').innerHTML = `<strong>Order #${payload.orderId}</strong><div>Table: ${payload.table ?? 'TA'}</div><div>Items: ${payload.items.length}</div><div class="note">Waiting for remote updates...</div>`;
+}
+
+/* When remote marks completed */
+function showOrderCompleted(){
+  id('orderStatus').classList.remove('hidden');
+  id('orderStatus').innerHTML = `<div class="status">Order completed! <b>Enjoy your meal.</b></div>`;
+  // also show a small toast in summary modal if open
+  id('afterPlaceStatus').textContent = 'Order completed! Enjoy your meal.';
+}
+
+/* -------------------------
+   Generate order & send
+   ------------------------- */
+function placeOrder(){
+  const items = Object.values(cart).map(c=>({ id: c.item.id, name: c.item.name, qty: c.qty, price: c.item.price }));
+  if (items.length===0) return alert('Cart empty');
+  const total = items.reduce((s,it)=>s+it.price*it.qty,0);
+  const payload = {
+    orderId: 'ord-' + Date.now() + '-' + Math.floor(Math.random()*9000+1000),
+    createdAt: new Date().toISOString(),
+    table: currentTable ? String(currentTable) : 'TA', // TA = takeaway
+    items,
+    total,
+    status: 'new'
+  };
+  publishOrderPayload(payload);
+}
+
+/* -------------------------
+   QR scanner logic using jsQR
+   ------------------------- */
+let video = id('video');
+let canvas = id('canvas');
+let scanning = false;
+let videoStream = null;
+
+async function startScanner(){
+  id('scannerModal').classList.remove('hidden');
+  id('scannerStatus').textContent = 'Requesting camera permission...';
+  try {
+    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } , audio:false});
+    video.srcObject = videoStream;
+    await video.play();
+    canvas.width = video.videoWidth || 640;
+    canvas.height = video.videoHeight || 480;
+    scanning = true;
+    id('scannerStatus').textContent = 'Scanning...';
+    tickScan();
+  } catch (e){
+    console.error(e);
+    id('scannerStatus').textContent = 'Camera permission denied or not available.';
+    alert('Camera permission was denied or not available. Dine-in QR scan needs a camera.');
+  }
+}
+
+function stopScanner(){
+  scanning = false;
+  if (videoStream){
+    videoStream.getTracks().forEach(t=>t.stop());
+    videoStream = null;
+  }
+  id('scannerModal').classList.add('hidden');
+}
+
+/* scan loop */
+function tickScan(){
+  if (!scanning) return;
+  const ctx = canvas.getContext('2d');
+  try {
+    canvas.width = video.videoWidth;
+    canvas.height = video.videoHeight;
+    ctx.drawImage(video, 0,0, canvas.width, canvas.height);
+    const imageData = ctx.getImageData(0,0, canvas.width, canvas.height);
+    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
+    if (code){
+      id('scannerStatus').textContent = 'QR detected';
+      // parse content like "ascuoii 12"
+      const txt = (code.data || '').trim();
+      const m = txt.match(/^ascuoii\s+(\d+)$/i);
+      if (m){
+        const tableNum = m[1];
+        currentTable = tableNum;
+        stopScanner();
+        alert('Detected table: ' + tableNum);
+        return;
+      } else {
+        id('scannerStatus').textContent = 'QR does not match expected format';
+      }
+    } else {
+      id('scannerStatus').textContent = 'Scanning...';
+    }
+  } catch (e){
+    console.error('scan error', e);
+  }
+  requestAnimationFrame(tickScan);
+}
+
+/* -------------------------
+   UI wiring
+   ------------------------- */
+document.addEventListener('DOMContentLoaded', ()=>{
+  renderMenu();
+  refreshFinishButton();
+  initAbly();
+
+  id('dineBtn').addEventListener('click', ()=>{
+    startScanner();
+  });
+  id('closeScanner').addEventListener('click', ()=> stopScanner());
+
+  id('finishBtn').addEventListener('click', openSummary);
+  id('closeSummary').addEventListener('click', ()=> id('summaryModal').classList.add('hidden'));
+  id('editCartBtn').addEventListener('click', ()=> id('summaryModal').classList.add('hidden'));
+  id('placeOrderBtn').addEventListener('click', placeOrder);
+
+  // helpful mock: clicking takeaway sets currentTable null and alert
+  id('takeawayBtn').addEventListener('click', ()=>{
+    currentTable = null;
+    alert('Takeaway mode selected.');
+  });
+
+  // help
+  id('help').addEventListener('click', ()=>{
+    alert('How to use:\n1) Click Dine In and allow camera.\n2) Scan QR like: "ascuoii 12".\n3) Tap + on items to add.\n4) Click Finish Order -> Order to send via Ably.\nNote: set ABLY_KEY variable at top to enable realtime.\nThis is pretend demo.');
+  });
+});
+
+/* debugging: expose some state on window for other dev page access */
+window._pretend = {
+  cart, MENU, setAblyKey: (k)=>{ ABLY_KEY = k; initAbly(); }
+};
+
+</script>
+</body>
+</html>
