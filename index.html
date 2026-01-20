@@ -10,283 +10,179 @@
     --muted:#666;
     --card:#fff;
     --bg:#f4f5f7;
-    --glass: rgba(255,255,255,0.85);
+    --glass: rgba(255,255,255,0.95);
   }
-  html,body{height:100%;margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#111}
-  .app{max-width:980px;margin:18px auto;padding:16px}
-  header{display:flex;align-items:center;gap:12px}
+  html,body{margin:0;font-family:Inter,system-ui,Arial,sans-serif;background:var(--bg);color:#111;min-height:100%}
+  
+  /* FIX: Added padding-bottom so the floating button doesn't cover content */
+  .app{max-width:980px;margin:0 auto;padding:16px;padding-bottom:100px}
+  
+  header{display:flex;align-items:center;gap:12px;margin-top:10px}
   header h1{margin:0;font-size:20px}
   .note{font-size:13px;color:var(--muted)}
   .controls{display:flex;gap:8px;margin-top:12px;flex-wrap:wrap}
-  .btn{background:var(--accent);color:#fff;padding:10px 14px;border-radius:10px;border:0;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;gap:8px}
+  .btn{background:var(--accent);color:#fff;padding:12px 16px;border-radius:10px;border:0;cursor:pointer;font-weight:600;display:inline-flex;align-items:center;justify-content:center;gap:8px}
   .btn.secondary{background:#fff;color:var(--accent);border:1px solid #eee}
   .btn.ghost{background:transparent;color:var(--accent);border:1px dashed #ffd0b8}
-  .card{background:var(--card);padding:12px;border-radius:12px;box-shadow:0 6px 18px rgba(10,10,10,0.04);margin-top:16px}
-  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:12px;margin-top:12px}
-  .menu-item{display:flex;gap:10px;align-items:center;padding:8px;border-radius:10px;border:1px solid #f0f0f0}
-  .item-info{flex:1}
-  .item-title{font-weight:700}
-  .item-price{font-size:13px;color:var(--muted);margin-top:4px}
-  .qty{display:inline-flex;align-items:center;border-radius:999px;overflow:hidden;border:1px solid #eee}
-  .qty button{width:34px;height:34px;border:0;background:transparent;cursor:pointer;font-weight:700}
-  .qty .count{padding:0 10px;min-width:36px;text-align:center}
-  .finish-floating{position:fixed;left:50%;transform:translateX(-50%);bottom:16px;z-index:60}
-  .hidden{display:none}
-  /* scanner */
-  #scannerModal{position:fixed;inset:0;background:rgba(0,0,0,0.65);display:flex;align-items:center;justify-content:center;z-index:80}
-  #scannerCard{width:95%;max-width:520px;background:var(--glass);backdrop-filter:blur(4px);padding:12px;border-radius:12px}
-  video{width:100%;height:auto;border-radius:10px;background:#000}
-  .scanner-info{display:flex;justify-content:space-between;align-items:center;margin-top:8px}
-  .summary-list{max-height:50vh;overflow:auto;margin-top:8px}
-  .summary-row{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px dashed #eee}
-  .status{margin-top:8px;padding:8px;border-radius:8px;background:#f0fdf4;color:#1e7516;border:1px solid #d9f5d5}
-  small.hint{color:var(--muted)}
-  footer{margin-top:22px;font-size:12px;color:var(--muted)}
-  .icon-placeholder{width:54px;height:54px;border-radius:8px;background:linear-gradient(135deg,#fff,#f6f6f6);display:flex;align-items:center;justify-content:center;font-weight:700;color:#ccc}
+  
+  .card{background:var(--card);padding:16px;border-radius:12px;box-shadow:0 6px 18px rgba(0,0,0,0.05);margin-top:16px}
+  .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(280px,1fr));gap:12px;margin-top:12px}
+  
+  /* FIX: Prevent text clipping in menu items */
+  .menu-item{display:flex;gap:12px;align-items:center;padding:10px;border-radius:10px;border:1px solid #f0f0f0;background:#fff}
+  .item-info{flex:1;min-width:0}
+  .item-title{font-weight:700;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  .item-price{font-size:13px;color:var(--muted);margin-top:2px}
+  
+  .qty{display:inline-flex;align-items:center;border-radius:999px;background:#f8f9fa;border:1px solid #eee}
+  .qty button{width:36px;height:36px;border:0;background:transparent;cursor:pointer;font-weight:700;font-size:18px}
+  .qty .count{padding:0 4px;min-width:24px;text-align:center;font-weight:600}
+  
+  .finish-floating{position:fixed;left:0;right:0;bottom:0;padding:20px;background:linear-gradient(to top, var(--bg) 60%, transparent);z-index:60;display:flex;justify-content:center}
+  .hidden{display:none !important}
+  
+  /* Modal fixes to prevent screen clipping */
+  #scannerModal, #summaryModal{position:fixed;inset:0;background:rgba(0,0,0,0.7);display:flex;align-items:center;justify-content:center;z-index:100;padding:16px}
+  .modal-card{width:100%;max-width:500px;background:#fff;padding:20px;border-radius:16px;max-height:90vh;overflow-y:auto}
+  
+  video{width:100%;height:auto;border-radius:10px;background:#000;transform: scaleX(-1)}
+  .summary-row{display:flex;justify-content:space-between;padding:10px 0;border-bottom:1px dashed #eee}
+  footer{margin-top:30px;padding:20px 0;text-align:center;font-size:12px;color:var(--muted);border-top:1px solid #eee}
+  
   @media (min-width:780px){header h1{font-size:24px}}
 </style>
 </head>
 <body>
+
 <div class="app">
   <header>
-    <img src="" alt="broken" style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#ffd9c2,#ffb38a)" />
+    <div style="width:48px;height:48px;border-radius:10px;background:linear-gradient(135deg,#ffd9c2,#ff6b00)"></div>
     <div>
       <h1>Dine-in</h1>
-      <div class="note">Welcome to the dine-in.</div>
+      <div class="note">Welcome to the ordering system.</div>
     </div>
   </header>
 
   <div class="controls">
-    <button id="dineBtn" class="btn">🍽️ Dine In*</button>
-    <button id="takeawayBtn" class="btn secondary">🛍️ Takeaway*</button>
+    <button id="dineBtn" class="btn">🍽️ Dine In</button>
+    <button id="takeawayBtn" class="btn secondary">🛍️ Takeaway</button>
     <button id="help" class="btn ghost">❓ Help</button>
   </div>
 
   <div class="card">
     <strong>Menu</strong>
-    <div class="note">Here is what you can order.</div>
-
-    <div style="margin-top:12px">
-      <h3>Fried Rice</h3>
-      <div id="nasgorList" class="grid"></div>
-    </div>
-
-    <div style="margin-top:12px">
-      <h3>Main Dishes</h3>
-      <div id="mainsList" class="grid"></div>
-    </div>
-
-    <div style="margin-top:12px">
-      <h3>Drinks</h3>
-      <div id="drinksList" class="grid"></div>
-    </div>
+    <div id="nasgorList" class="grid"></div>
+    <div id="mainsList" class="grid"></div>
+    <div id="drinksList" class="grid"></div>
   </div>
 
   <div id="orderStatus" class="card hidden"></div>
 
-  <div class="finish-floating hidden" id="finishWrap">
-    <button id="finishBtn" class="btn" style="min-width:220px">Finish Order • <span id="cartCount">0</span> items</button>
-  </div>
-
   <footer>
-    <div>you gotta pay bro, gimme the money</div>
+    <div>Please settle your bill at the counter.</div>
   </footer>
 </div>
 
-<script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
-<script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
+<div class="finish-floating hidden" id="finishWrap">
+  <button id="finishBtn" class="btn" style="width:100%; max-width:400px; box-shadow:0 4px 15px rgba(255,107,0,0.3)">
+    Finish Order • <span id="cartCount">0</span> items
+  </button>
+</div>
 
+<div id="summaryModal" class="hidden">
+  <div class="modal-card">
+    <h3>Order Summary</h3>
+    <div id="summaryList"></div>
+    <div style="margin-top:20px; display:flex; justify-content:space-between; font-weight:800; font-size:18px">
+      <span>Total</span>
+      <span id="summaryTotal">Rp 0</span>
+    </div>
+    <div style="margin-top:20px; display:grid; grid-template-columns:1fr 1fr; gap:10px">
+      <button id="closeSummary" class="btn secondary">Back</button>
+      <button id="placeOrderBtn" class="btn">Place Order</button>
+    </div>
+  </div>
+</div>
+
+<script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
 <script>
 const ABLY_KEY = ''; 
 const GOFILE_BASE = 'https://applicationordering-ship-it.github.io/justaproject/'; 
 
 const MENU = {
-  nasigoreng: [
-    { id: 'ng_ayam', name: 'Chicken Fried Rice', price: 28000, icon: 'nasi_goreng_ayam.png' },
-    { id: 'ng_spesial', name: 'Special Fried Rice', price: 28000, icon: 'nasi_goreng_spesial.png' },
-    { id: 'ng_ikan', name: 'Nasi Goreng Ikan Asin', price: 26000, icon: 'nasi_goreng_ikan.png' },
-    { id: 'ng_aceh', name: 'Nasi Goreng Aceh', price: 27000, icon: 'nasi_goreng_aceh.png' },
-    { id: 'ng_jawa', name: 'Nasi Goreng Jawa', price: 27000, icon: 'nasi_goreng_jawa.png' }
-  ],
-  mains: [
-    { id: 'ch_pep', name: 'Chicken Pepperoni Feast', price: 18000, icon: 'ch_pepperoni.png' },
-    { id: 'ch_delight', name: 'Chicken Delight', price: 20000, icon: 'chicken_delight.png' },
-    { id: 'tuna_delight', name: 'Tuna Delight', price: 21000, icon: 'tuna_delight.png' },
-    { id: 'indomie_goreng',name: "Indomie Goreng", price: 18000, icon: 'indomiie_goreng.png' }
-  ],
-  drinks: [
-    { id: 'air', name: 'Mineral Water', price: 10000, icon: 'air_mineral.png' },
-    { id: 'milo', name: 'Milo', price: 15000, icon: 'milo.png' },
-    { id: 'susu_v', name: 'Vanila Milk', price: 15000, icon: 'susu_vanila.png' },
-    { id: 'vani', name: 'Vanilla Smoothie', price: 18000, icon: 'vanilla_smoothie.png' },
-    { id: 'choc', name: 'Chocolate Smoothie', price: 20000, icon: 'chocolate_smoothie.png' },
-    { id: 'gt', name: 'Green Tea', price: 18000, icon: 'green_tea.png' }
-  ]
+  nasigoreng: [{ id: 'ng_ayam', name: 'Chicken Fried Rice', price: 28000, icon: 'nasi_goreng_ayam.png' }],
+  mains: [{ id: 'ch_pep', name: 'Chicken Pepperoni Feast', price: 18000, icon: 'ch_pepperoni.png' }],
+  drinks: [{ id: 'milo', name: 'Milo', price: 15000, icon: 'milo.png' }]
 };
 
 let cart = {}; 
-let currentTable = null; 
-let currentOrderId = null;
-
 const id = (s)=>document.getElementById(s);
 const fmt = (n)=> new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(n);
 
 function makeItemCard(it){
   const el = document.createElement('div');
   el.className = 'menu-item';
-  const iconWrap = document.createElement('div');
-
-  if (GOFILE_BASE) {
-    const img = document.createElement('img');
-    img.src = GOFILE_BASE.replace(/\/$/,'') + '/' + it.icon;
-    img.alt = it.name;
-    img.style.width='54px'; img.style.height='54px'; img.style.borderRadius='8px'; img.style.objectFit='cover';
-    iconWrap.appendChild(img);
-  } else {
-    const ph = document.createElement('div');
-    ph.className = 'icon-placeholder';
-    ph.textContent = it.name.split(' ').map(x=>x[0]).slice(0,2).join('');
-    iconWrap.appendChild(ph);
-  }
-
-  el.appendChild(iconWrap);
-
-  const info = document.createElement('div');
-  info.className = 'item-info';
-  const title = document.createElement('div');
-  title.className = 'item-title';
-  title.textContent = it.name + ' *';
-  const price = document.createElement('div');
-  price.className = 'item-price';
-  price.textContent = fmt(it.price);
-  info.appendChild(title);
-  info.appendChild(price);
-
-  const controls = document.createElement('div');
-  controls.style.display='flex';
-  controls.style.alignItems='center';
-  controls.style.gap='8px';
-  const qty = document.createElement('div');
-  qty.className = 'qty';
   
-  const minus = document.createElement('button');
-  minus.textContent='−';
-  
-  const count = document.createElement('div');
-  count.className='count';
-  count.textContent = '0';
-  
-  const plus = document.createElement('button');
-  plus.textContent='+';
+  el.innerHTML = `
+    <div style="width:54px;height:54px;background:#eee;border-radius:8px"></div>
+    <div class="item-info">
+      <div class="item-title">${it.name}</div>
+      <div class="item-price">${fmt(it.price)}</div>
+    </div>
+    <div class="qty">
+      <button class="minus">−</button>
+      <div class="count">0</div>
+      <button class="plus">+</button>
+    </div>
+  `;
 
-  // FIX: Attach event listeners directly here
-  minus.addEventListener('click', () => changeQty(it, -1, count));
-  plus.addEventListener('click', () => changeQty(it, 1, count));
+  // Attach logic directly to the buttons within this card
+  const countEl = el.querySelector('.count');
+  el.querySelector('.minus').onclick = () => changeQty(it, -1, countEl);
+  el.querySelector('.plus').onclick = () => changeQty(it, 1, countEl);
 
-  qty.appendChild(minus); 
-  qty.appendChild(count); 
-  qty.appendChild(plus);
-  controls.appendChild(qty);
-
-  el.appendChild(info);
-  el.appendChild(controls);
   return el;
 }
 
 function changeQty(item, delta, countEl){
-  const id_ = item.id;
-  const prev = cart[id_] ? cart[id_].qty : 0;
-  const next = prev + delta;
-  if (next <= 0) {
-    delete cart[id_];
-    if (countEl) countEl.textContent='0';
-  } else {
-    cart[id_] = { item, qty: next };
-    if (countEl) countEl.textContent = String(next);
-  }
+  const current = cart[item.id] ? cart[item.id].qty : 0;
+  const next = Math.max(0, current + delta);
+  
+  if (next === 0) delete cart[item.id];
+  else cart[item.id] = { item, qty: next };
+  
+  countEl.textContent = next;
   refreshFinishButton();
-}
-
-function renderMenu(){
-  const nasgor = id('nasgorList');
-  const mains = id('mainsList');
-  const drinks = id('drinksList');
-  [nasgor, mains, drinks].forEach(n => n.innerHTML='');
-  MENU.nasigoreng.forEach(i=>nasgor.appendChild(makeItemCard(i)));
-  MENU.mains.forEach(i=>mains.appendChild(makeItemCard(i)));
-  MENU.drinks.forEach(i=>drinks.appendChild(makeItemCard(i)));
 }
 
 function refreshFinishButton(){
   const count = Object.values(cart).reduce((s,c)=>s+c.qty,0);
   id('cartCount').textContent = count;
-  if (count>0) id('finishWrap').classList.remove('hidden'); else id('finishWrap').classList.add('hidden');
+  id('finishWrap').classList.toggle('hidden', count === 0);
 }
 
-let ablyClient = null;
-let ablyChannel = null;
-
-function initAbly(){
-  if (!ABLY_KEY || ABLY_KEY.includes('YOUR-ABLY')) return;
-  try {
-    ablyClient = new Ably.Realtime({ key: ABLY_KEY });
-    ablyChannel = ablyClient.channels.get('food-orders-demo');
-    ablyChannel.subscribe((msg) => {
-      const data = msg.data || {};
-      if (data.orderId === currentOrderId && data.status === 'completed'){
-        showOrderCompleted();
-      }
-    });
-  } catch (e){ console.error(e); }
-}
-
-function publishOrderPayload(payload){
-  if (!ablyChannel){
-    onOrderSentLocally(payload);
-    return;
-  }
-  ablyChannel.publish('new-order', payload, function(err){
-    if (!err) onOrderSentLocally(payload);
+function renderMenu(){
+  Object.keys(MENU).forEach(cat => {
+    const container = id(cat + 'List');
+    if(container) MENU[cat].forEach(it => container.appendChild(makeItemCard(it)));
   });
 }
 
-function onOrderSentLocally(payload){
-  currentOrderId = payload.orderId;
-  id('orderStatus').classList.remove('hidden');
-  id('orderStatus').innerHTML = `<strong>Order #${payload.orderId}</strong><div>Table: ${payload.table ?? 'TA'}</div><div>Items: ${payload.items.length}</div><div class="note">Waiting for remote updates...</div>`;
-}
+id('finishBtn').onclick = () => {
+  const list = id('summaryList');
+  list.innerHTML = '';
+  let total = 0;
+  Object.values(cart).forEach(c => {
+    total += c.item.price * c.qty;
+    list.innerHTML += `<div class="summary-row"><span>${c.qty}x ${c.item.name}</span><span>${fmt(c.item.price * c.qty)}</span></div>`;
+  });
+  id('summaryTotal').textContent = fmt(total);
+  id('summaryModal').classList.remove('hidden');
+};
 
-function showOrderCompleted(){
-  id('orderStatus').innerHTML = `<div class="status">Order completed! <b>Enjoy your meal.</b></div>`;
-}
+id('closeSummary').onclick = () => id('summaryModal').classList.add('hidden');
 
-function placeOrder(){
-  const items = Object.values(cart).map(c=>({ id: c.item.id, name: c.item.name, qty: c.qty, price: c.item.price }));
-  if (items.length===0) return alert('Cart empty');
-  const total = items.reduce((s,it)=>s+it.price*it.qty,0);
-  const payload = {
-    orderId: 'ord-' + Date.now() + '-' + Math.floor(Math.random()*9000+1000),
-    createdAt: new Date().toISOString(),
-    table: currentTable ? String(currentTable) : 'TA',
-    items,
-    total,
-    status: 'new'
-  };
-  publishOrderPayload(payload);
-}
-
-document.addEventListener('DOMContentLoaded', ()=>{
-  renderMenu();
-  refreshFinishButton();
-  initAbly();
-
-  id('dineBtn').addEventListener('click', () => alert('Scanning'));
-  id('takeawayBtn').addEventListener('click', () => { currentTable = null; alert('Takeaway selected'); });
-  id('finishBtn').addEventListener('click', placeOrder);
-  id('help').addEventListener('click', () => alert('Tap + on items to add. Click Finish to send order.'));
-});
-
-window._pretend = { cart, MENU };
+document.addEventListener('DOMContentLoaded', renderMenu);
 </script>
 </body>
 </html>
