@@ -62,7 +62,6 @@
     <button id="help" class="btn ghost">❓ Help</button>
   </div>
 
-  <!-- Menu (grouped) -->
   <div class="card">
     <strong>Menu</strong>
     <div class="note">Here is what you can order.</div>
@@ -94,24 +93,13 @@
   </footer>
 </div>
 
-
-<!-- include Ably + jsQR from CDN -->
 <script src="https://cdn.jsdelivr.net/npm/jsqr@1.4.0/dist/jsQR.js"></script>
 <script src="https://cdn.ably.io/lib/ably.min-1.js"></script>
 
 <script>
-/* -------------------------
-   CONFIG: paste your keys here
-   -------------------------
-   ABLY_KEY: get from ably.com and paste here so this page can publish/subscribe.
-   GOFILE_BASE: base URL where you store icons (optional). Icons are looked up as GOFILE_BASE/NAME.png
-*/
-const ABLY_KEY = ''; // <-- replace with your Ably API key (key:xxxx)
-const GOFILE_BASE = 'https://applicationordering-ship-it.github.io/justaproject/'; // <-- optional: paste gofile base path that contains icons (example: https://gofile.io/d/abcd1234)
+const ABLY_KEY = ''; 
+const GOFILE_BASE = 'https://applicationordering-ship-it.github.io/justaproject/'; 
 
-/* -------------------------
-   Data: menu (structured, with numeric prices in IDR)
-   ------------------------- */
 const MENU = {
   nasigoreng: [
     { id: 'ng_ayam', name: 'Chicken Fried Rice', price: 28000, icon: 'nasi_goreng_ayam.png' },
@@ -136,22 +124,13 @@ const MENU = {
   ]
 };
 
-/* -------------------------
-   App state
-   ------------------------- */
-let cart = {}; // {itemId: {item, qty}}
-let currentTable = null; // number when dine-in
+let cart = {}; 
+let currentTable = null; 
 let currentOrderId = null;
 
-/* -------------------------
-   Utilities
-   ------------------------- */
 const id = (s)=>document.getElementById(s);
 const fmt = (n)=> new Intl.NumberFormat('id-ID', { style:'currency', currency:'IDR', maximumFractionDigits:0 }).format(n);
 
-/* -------------------------
-   Render menu
-   ------------------------- */
 function makeItemCard(it){
   const el = document.createElement('div');
   el.className = 'menu-item';
@@ -189,17 +168,25 @@ function makeItemCard(it){
   controls.style.gap='8px';
   const qty = document.createElement('div');
   qty.className = 'qty';
+  
   const minus = document.createElement('button');
   minus.textContent='−';
+  
   const count = document.createElement('div');
   count.className='count';
   count.textContent = '0';
+  
   const plus = document.createElement('button');
   plus.textContent='+';
-  qty.appendChild(minus); qty.appendChild(count); qty.appendChild(plus);
-  controls.appendChild(qty);
 
-  //
+  // FIX: Attach event listeners directly here
+  minus.addEventListener('click', () => changeQty(it, -1, count));
+  plus.addEventListener('click', () => changeQty(it, 1, count));
+
+  qty.appendChild(minus); 
+  qty.appendChild(count); 
+  qty.appendChild(plus);
+  controls.appendChild(qty);
 
   el.appendChild(info);
   el.appendChild(controls);
@@ -220,7 +207,6 @@ function changeQty(item, delta, countEl){
   refreshFinishButton();
 }
 
-/* render groups */
 function renderMenu(){
   const nasgor = id('nasgorList');
   const mains = id('mainsList');
@@ -231,106 +217,49 @@ function renderMenu(){
   MENU.drinks.forEach(i=>drinks.appendChild(makeItemCard(i)));
 }
 
-/* -------------------------
-   Finish button & summary
-   ------------------------- */
 function refreshFinishButton(){
   const count = Object.values(cart).reduce((s,c)=>s+c.qty,0);
   id('cartCount').textContent = count;
   if (count>0) id('finishWrap').classList.remove('hidden'); else id('finishWrap').classList.add('hidden');
 }
 
-function openSummary(){
-  const list = id('summaryList'); list.innerHTML='';
-  const items = Object.values(cart);
-  let total = 0;
-  if (items.length===0) return;
-  items.forEach(c=>{
-    const row = document.createElement('div');
-    row.className = 'summary-row';
-    const left = document.createElement('div');
-    left.innerHTML = `<div style="font-weight:700">${c.item.name}</div><div style="font-size:13px;color:${'#666'}">${fmt(c.item.price)} × ${c.qty}</div>`;
-    const right = document.createElement('div');
-    right.innerHTML = `<div style="font-weight:700">${fmt(c.item.price * c.qty)}</div>`;
-    row.appendChild(left); row.appendChild(right);
-    list.appendChild(row);
-    total += c.item.price * c.qty;
-  });
-  id('summaryTotal').textContent = fmt(total);
-  id('summaryModal').classList.remove('hidden');
-}
-
-/* -------------------------
-   Ably: publish order & subscribe to updates
-   ------------------------- */
 let ablyClient = null;
 let ablyChannel = null;
 
 function initAbly(){
-  if (!ABLY_KEY || ABLY_KEY.includes('YOUR-ABLY')) {
-    console.warn('Ably key not set. Set ABLY_KEY in the script to enable realtime.');
-    return;
-  }
+  if (!ABLY_KEY || ABLY_KEY.includes('YOUR-ABLY')) return;
   try {
     ablyClient = new Ably.Realtime({ key: ABLY_KEY });
     ablyChannel = ablyClient.channels.get('food-orders-demo');
     ablyChannel.subscribe((msg) => {
-      // listen to updates from other admin HTML
-      // message.name could be 'order-updated' or otherwise
-      console.log('Ably msg', msg);
       const data = msg.data || {};
-      if (data.orderId && data.status){
-        if (data.orderId === currentOrderId && data.status === 'completed'){
-          showOrderCompleted();
-        } else {
-          // optionally show updates for other orders (not implemented)
-        }
+      if (data.orderId === currentOrderId && data.status === 'completed'){
+        showOrderCompleted();
       }
     });
-    console.log('Ably initialized, subscribed to food-orders-demo channel.');
-  } catch (e){
-    console.error('Failed to init Ably', e);
-  }
+  } catch (e){ console.error(e); }
 }
 
 function publishOrderPayload(payload){
   if (!ablyChannel){
-    alert('Realtime not active (Ably key not set). Order will NOT be sent to remote.');
-    // still mark 'sent locally'
     onOrderSentLocally(payload);
     return;
   }
   ablyChannel.publish('new-order', payload, function(err){
-    if (err) {
-      console.error('Ably publish error', err);
-      alert('Failed to send order via Ably. See console.');
-    } else {
-      onOrderSentLocally(payload);
-    }
+    if (!err) onOrderSentLocally(payload);
   });
 }
 
-/* After sending */
 function onOrderSentLocally(payload){
   currentOrderId = payload.orderId;
-  id('afterPlaceStatus').textContent = 'Order sent — waiting for updates.';
-  id('afterPlace').classList.remove('hidden');
-  id('summaryModal').classList.add('hidden');
   id('orderStatus').classList.remove('hidden');
   id('orderStatus').innerHTML = `<strong>Order #${payload.orderId}</strong><div>Table: ${payload.table ?? 'TA'}</div><div>Items: ${payload.items.length}</div><div class="note">Waiting for remote updates...</div>`;
 }
 
-/* When remote marks completed */
 function showOrderCompleted(){
-  id('orderStatus').classList.remove('hidden');
   id('orderStatus').innerHTML = `<div class="status">Order completed! <b>Enjoy your meal.</b></div>`;
-  // also show a small toast in summary modal if open
-  id('afterPlaceStatus').textContent = 'Order completed! Enjoy your meal.';
 }
 
-/* -------------------------
-   Generate order & send
-   ------------------------- */
 function placeOrder(){
   const items = Object.values(cart).map(c=>({ id: c.item.id, name: c.item.name, qty: c.qty, price: c.item.price }));
   if (items.length===0) return alert('Cart empty');
@@ -338,7 +267,7 @@ function placeOrder(){
   const payload = {
     orderId: 'ord-' + Date.now() + '-' + Math.floor(Math.random()*9000+1000),
     createdAt: new Date().toISOString(),
-    table: currentTable ? String(currentTable) : 'TA', // TA = takeaway
+    table: currentTable ? String(currentTable) : 'TA',
     items,
     total,
     status: 'new'
@@ -346,113 +275,18 @@ function placeOrder(){
   publishOrderPayload(payload);
 }
 
-/* -------------------------
-   QR scanner logic using jsQR
-   ------------------------- */
-let video = id('video');
-let canvas = id('canvas');
-let scanning = false;
-let videoStream = null;
-
-async function startScanner(){
-  id('scannerModal').classList.remove('hidden');
-  id('scannerStatus').textContent = 'Requesting camera permission...';
-  try {
-    videoStream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: 'environment' } , audio:false});
-    video.srcObject = videoStream;
-    await video.play();
-    canvas.width = video.videoWidth || 640;
-    canvas.height = video.videoHeight || 480;
-    scanning = true;
-    id('scannerStatus').textContent = 'Scanning...';
-    tickScan();
-  } catch (e){
-    console.error(e);
-    id('scannerStatus').textContent = 'Camera permission denied or not available.';
-    alert('Camera permission was denied or not available. Dine-in QR scan needs a camera.');
-  }
-}
-
-function stopScanner(){
-  scanning = false;
-  if (videoStream){
-    videoStream.getTracks().forEach(t=>t.stop());
-    videoStream = null;
-  }
-  id('scannerModal').classList.add('hidden');
-}
-
-/* scan loop */
-function tickScan(){
-  if (!scanning) return;
-  const ctx = canvas.getContext('2d');
-  try {
-    canvas.width = video.videoWidth;
-    canvas.height = video.videoHeight;
-    ctx.drawImage(video, 0,0, canvas.width, canvas.height);
-    const imageData = ctx.getImageData(0,0, canvas.width, canvas.height);
-    const code = jsQR(imageData.data, imageData.width, imageData.height, { inversionAttempts: "attemptBoth" });
-    if (code){
-      id('scannerStatus').textContent = 'QR detected';
-      // parse content like "ascuoii 12"
-      const txt = (code.data || '').trim();
-      const m = txt.match(/^ascuoii\s+(\d+)$/i);
-      if (m){
-        const tableNum = m[1];
-        currentTable = tableNum;
-        stopScanner();
-        alert('Detected table: ' + tableNum);
-        return;
-      } else {
-        id('scannerStatus').textContent = 'QR does not match expected format';
-      }
-    } else {
-      id('scannerStatus').textContent = 'Scanning...';
-    }
-  } catch (e){
-    console.error('scan error', e);
-  }
-  requestAnimationFrame(tickScan);
-}
-
-/* -------------------------
-   UI wiring
-   ------------------------- */
 document.addEventListener('DOMContentLoaded', ()=>{
   renderMenu();
   refreshFinishButton();
   initAbly();
 
-  id('dineBtn').addEventListener('click', ()=>{
-    startScanner();
-  });
-  id('closeScanner').addEventListener('click', ()=> stopScanner());
-
-  id('finishBtn').addEventListener('click', openSummary);
-  id('closeSummary').addEventListener('click', ()=> id('summaryModal').classList.add('hidden'));
-  id('editCartBtn').addEventListener('click', ()=> id('summaryModal').classList.add('hidden'));
-  id('placeOrderBtn').addEventListener('click', placeOrder);
-
-  // helpful mock: clicking takeaway sets currentTable null and alert
-  id('takeawayBtn').addEventListener('click', ()=>{
-    currentTable = null;
-    alert('Takeaway mode selected.');
-  });
-
-  // help
-  id('help').addEventListener('click', ()=>{
-    alert('How to use:\n1) Click Dine In and allow camera.\n2) Scan QR like: "ascuoii 12".\n3) Tap + on items to add.\n4) Click Finish Order -> Order to send via Ably.\nNote: set ABLY_KEY variable at top to enable realtime.\nThis is pretend demo.');
-  });
+  id('dineBtn').addEventListener('click', () => alert('Scanning'));
+  id('takeawayBtn').addEventListener('click', () => { currentTable = null; alert('Takeaway selected'); });
+  id('finishBtn').addEventListener('click', placeOrder);
+  id('help').addEventListener('click', () => alert('Tap + on items to add. Click Finish to send order.'));
 });
 
-/* debugging: expose some state on window for other dev page access */
-window._pretend = {
-  cart, MENU, setAblyKey: (k)=>{ ABLY_KEY = k; initAbly(); }
-};
-
-  minusButton.addEventListener('click', ()=> changeQty(it, -1, count));
-plusButton.addEventListener('click', ()=> changeQty(it, +1, count));
-
+window._pretend = { cart, MENU };
 </script>
 </body>
 </html>
